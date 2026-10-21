@@ -1,0 +1,10 @@
+# SupplyPulse - Core Dependencies for ETL, NLP, AI & Machine Learning
+pandas>=2.0.0
+numpy>=1.24.0
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.9
+python-dotenv>=1.0.0
+feedparser>=6.0.0
+spacy>=3.8.0
+scikit-learn>=1.3.0
+joblib>=1.3.0

@@ -1,0 +1,13 @@
+supplier_id,supplier_name,country,backup_supplier_name
+SUP-001,Shanghai Advanced Silicon Fab,China,Hsinchu Wafer Packaging Corp
+SUP-002,Shenzhen Opto-Precision Tech,China,Nippon Sensor Mechatronics
+SUP-003,Hanseatic Precision Hydraulics GmbH,Germany,Rotterdam Marine Assemblies
+SUP-004,Bavaria Automotive Sensor Systems,Germany,Stuttgart Micro Actuators
+SUP-005,Rotterdam Maritime Logistics Hub,Netherlands,Antwerp Terminal Solutions
+SUP-006,Eindhoven Semiconductor Photolithography,Netherlands,Dresden Advanced Silicon
+SUP-007,Chennai Fasteners & Industrial Alloys,India,Pune Industrial Castings Ltd
+SUP-008,Bengaluru Embedded Core Systems,India,Hyderabad VLSI Foundry
+SUP-009,SingaTech Precision Assembly Ltd,Singapore,Penang Mechatronics SDN BHD
+SUP-010,Jurong Intermodal Transshipment,Singapore,Tanjung Pelepas Logistics
+SUP-011,Yokohama Precision Dynamics,Japan,Nagoya Industrial Automation
+SUP-012,Taipei High-Density Interconnects,Taiwan,SingaTech Precision Assembly Ltd

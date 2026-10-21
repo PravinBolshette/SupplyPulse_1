@@ -1,0 +1,17 @@
+event_id,event_type,affected_region,severity_score
+EVT-2026-001,Typhoon,East China Sea / Yangtze Delta,8.1
+EVT-2026-002,Severe Flooding,Rhine-Meuse-Scheldt Delta,7.9
+EVT-2026-003,Earthquake,Taiwan Strait / Hsinchu Coast,9.2
+EVT-2026-004,Port Worker Strike,Elbe Estuary & Hamburg Area,8.0
+EVT-2026-005,Monsoon Surge & Flash Flood,Coromandel Coast / Bay of Bengal,6.8
+EVT-2026-006,Strait Navigational Blockage,Strait of Malacca,8.2
+EVT-2026-007,Winter Blizzard & Freezing Ice,Baltic Sea Shipping Approaches,6.4
+EVT-2026-008,Severe Typhoon Warning,South China Sea / Pearl River,8.1
+EVT-2026-009,Coastal Storm Surge,Tokyo Bay & Kanto Region,6.4
+EVT-2026-010,Customs Clearance Freeze,Rotterdam Logistics Terminal,6.2
+EVT-2026-011,Geopolitical Export Review,East Asian Semiconductor Corridor,8.2
+EVT-2026-012,Inland Rail Freight Stoppage,Northern European Freight Corridor,7.1
+EVT-2026-013,Tropical Depression,Bay of Bengal Coastal Zone,5.8
+EVT-2026-014,Container Berth Fire,Jurong Island Terminal,7.0
+EVT-2026-015,Dense Fog Navigational Ban,Shanghai Outer Anchorage,4.5
+EVT-2026-016,Labor Negotiation Stoppage,Antwerp Outer Docklands,5.8

@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: supplypulse_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: supplypulse
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_schema.sql:/docker-entrypoint-initdb.d/init_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d supplypulse"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
