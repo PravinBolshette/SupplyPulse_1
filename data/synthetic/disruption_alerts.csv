@@ -1,16 +1,16 @@
 supplier_id,anomaly_score,is_flagged,predicted_tti_days,recommended_action,created_at
-SUP-001,-0.5878,True,6,Reroute critical purchase orders to pre-mapped backup supplier.,2026-10-21 23:50:13.798307
-SUP-002,0.1601,False,21,Standard operational cadence maintained; continuous monitoring active.,2026-10-21 19:50:13.798338
-SUP-003,0.4092,False,20,Standard operational cadence maintained; continuous monitoring active.,2026-10-21 15:50:13.798365
-SUP-004,-0.5379,True,8,Activate contingency stock buffer and escalate to procurement director.,2026-10-21 11:50:13.798382
-SUP-005,0.0849,False,21,Standard operational cadence maintained; continuous monitoring active.,2026-10-21 07:50:13.798397
-SUP-006,-0.6164,True,4,Reroute critical purchase orders to pre-mapped backup supplier.,2026-10-21 03:50:13.798412
-SUP-007,-0.8356,True,3,Expedite priority safety stock replenishment buffer via air freight.,2026-10-20 23:50:13.798426
-SUP-008,0.4832,False,27,Standard operational cadence maintained; continuous monitoring active.,2026-10-20 19:50:13.798439
-SUP-009,0.1774,False,29,Standard operational cadence maintained; continuous monitoring active.,2026-10-20 15:50:13.798452
-SUP-010,-0.1555,True,2,Pre-book alternate container slot via secondary maritime carrier.,2026-10-20 11:50:13.798466
-SUP-011,-0.637,True,7,Reroute critical purchase orders to pre-mapped backup supplier.,2026-10-20 07:50:13.798478
-SUP-012,0.0542,False,22,Standard operational cadence maintained; continuous monitoring active.,2026-10-20 03:50:13.798491
-SUP-001,-0.6461,True,4,Reallocate production quota to alternative regional assembly lines.,2026-10-19 23:50:13.798504
-SUP-002,0.2899,False,29,Standard operational cadence maintained; continuous monitoring active.,2026-10-19 19:50:13.798516
-SUP-003,0.2253,False,29,Standard operational cadence maintained; continuous monitoring active.,2026-10-19 15:50:13.798530
+SUP-001,-0.5878,True,6,Reroute critical purchase orders to pre-mapped backup supplier.,2026-10-24 15:00:36.517495
+SUP-002,0.1601,False,21,Standard operational cadence maintained; continuous monitoring active.,2026-10-24 11:00:36.517517
+SUP-003,0.4092,False,20,Standard operational cadence maintained; continuous monitoring active.,2026-10-24 07:00:36.517534
+SUP-004,-0.5379,True,8,Activate contingency stock buffer and escalate to procurement director.,2026-10-24 03:00:36.517549
+SUP-005,0.0849,False,21,Standard operational cadence maintained; continuous monitoring active.,2026-10-23 23:00:36.517562
+SUP-006,-0.6164,True,4,Reroute critical purchase orders to pre-mapped backup supplier.,2026-10-23 19:00:36.517575
+SUP-007,-0.8356,True,3,Expedite priority safety stock replenishment buffer via air freight.,2026-10-23 15:00:36.517587
+SUP-008,0.4832,False,27,Standard operational cadence maintained; continuous monitoring active.,2026-10-23 11:00:36.517599
+SUP-009,0.1774,False,29,Standard operational cadence maintained; continuous monitoring active.,2026-10-23 07:00:36.517612
+SUP-010,-0.1555,True,2,Pre-book alternate container slot via secondary maritime carrier.,2026-10-23 03:00:36.517624
+SUP-011,-0.637,True,7,Reroute critical purchase orders to pre-mapped backup supplier.,2026-10-22 23:00:36.517636
+SUP-012,0.0542,False,22,Standard operational cadence maintained; continuous monitoring active.,2026-10-22 19:00:36.517648
+SUP-001,-0.6461,True,4,Reallocate production quota to alternative regional assembly lines.,2026-10-22 15:00:36.517660
+SUP-002,0.2899,False,29,Standard operational cadence maintained; continuous monitoring active.,2026-10-22 11:00:36.517672
+SUP-003,0.2253,False,29,Standard operational cadence maintained; continuous monitoring active.,2026-10-22 07:00:36.517684
