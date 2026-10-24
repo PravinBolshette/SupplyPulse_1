@@ -209,7 +209,11 @@ CREATE TABLE IF NOT EXISTS external_disruptions (
     event_id TEXT PRIMARY KEY,
     event_type TEXT NOT NULL,
     affected_region TEXT NOT NULL,
-    severity_score FLOAT CHECK (severity_score >= 0.0 AND severity_score <= 10.0)
+    severity_score FLOAT CHECK (severity_score >= 0.0 AND severity_score <= 10.0),
+    event_date DATE DEFAULT CURRENT_DATE,
+    source_text TEXT,
+    source TEXT,
+    parsed_method TEXT
 );
 
 -- Core Table 5: Disruption Alerts
@@ -221,6 +225,45 @@ CREATE TABLE IF NOT EXISTS disruption_alerts (
     predicted_tti_days INT NOT NULL,
     recommended_action TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Core Table 6: Audit Logs
+CREATE TABLE IF NOT EXISTS audit_logs (
+    log_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    operator_id VARCHAR(100) NOT NULL,
+    alert_id VARCHAR(100) NOT NULL,
+    ai_recommendation JSONB NOT NULL,
+    action_taken VARCHAR(50) NOT NULL CHECK (action_taken IN ('APPROVED', 'OVERRIDDEN', 'REJECTED')),
+    operator_notes TEXT,
+    confirmed BOOLEAN NOT NULL DEFAULT TRUE,
+    mitigation_target TEXT,
+    cost_exposure_usd NUMERIC(12, 2)
+);
+
+-- Core Table 7: Users
+CREATE TABLE IF NOT EXISTS users (
+    user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    username VARCHAR(50) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(20) NOT NULL CHECK (role IN ('analyst', 'manager', 'admin')),
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Core Table 8: Model Runs
+CREATE TABLE IF NOT EXISTS model_runs (
+    run_id SERIAL PRIMARY KEY,
+    model_version VARCHAR(50) NOT NULL,
+    model_type VARCHAR(100) NOT NULL,
+    trained_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    precision FLOAT,
+    recall FLOAT,
+    f1_score FLOAT,
+    baseline_precision FLOAT,
+    baseline_recall FLOAT,
+    baseline_f1 FLOAT,
+    dataset_description TEXT DEFAULT 'Evaluated on synthetic data',
+    is_active BOOLEAN DEFAULT TRUE
 );
 
 -- Performance Indexes
@@ -257,7 +300,11 @@ CREATE TABLE IF NOT EXISTS external_disruptions (
     event_id TEXT PRIMARY KEY,
     event_type TEXT NOT NULL,
     affected_region TEXT NOT NULL,
-    severity_score REAL CHECK (severity_score >= 0.0 AND severity_score <= 10.0)
+    severity_score REAL CHECK (severity_score >= 0.0 AND severity_score <= 10.0),
+    event_date TEXT,
+    source_text TEXT,
+    source TEXT,
+    parsed_method TEXT
 );
 
 CREATE TABLE IF NOT EXISTS disruption_alerts (
@@ -268,6 +315,42 @@ CREATE TABLE IF NOT EXISTS disruption_alerts (
     predicted_tti_days INTEGER NOT NULL,
     recommended_action TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+    log_id TEXT PRIMARY KEY,
+    timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+    operator_id TEXT NOT NULL,
+    alert_id TEXT NOT NULL,
+    ai_recommendation TEXT NOT NULL,
+    action_taken TEXT NOT NULL,
+    operator_notes TEXT,
+    confirmed INTEGER NOT NULL DEFAULT 1,
+    mitigation_target TEXT,
+    cost_exposure_usd REAL
+);
+
+CREATE TABLE IF NOT EXISTS users (
+    user_id TEXT PRIMARY KEY,
+    username TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS model_runs (
+    run_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    model_version TEXT NOT NULL,
+    model_type TEXT NOT NULL,
+    trained_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    precision REAL,
+    recall REAL,
+    f1_score REAL,
+    baseline_precision REAL,
+    baseline_recall REAL,
+    baseline_f1 REAL,
+    dataset_description TEXT DEFAULT 'Evaluated on synthetic data',
+    is_active INTEGER DEFAULT 1
 );
 """
 
