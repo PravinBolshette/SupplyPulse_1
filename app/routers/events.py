@@ -33,50 +33,72 @@ class ParsedEventResponse(BaseModel):
 
 
 def _get_events_from_db_if_available(limit: int = 20) -> Optional[List[ParsedEventResponse]]:
+    rows = None
     db_uri = os.getenv("DATABASE_URL")
-    if not db_uri or "postgresql" not in db_uri:
+    if db_uri and "postgresql" in db_uri:
+        try:
+            import psycopg2
+            conn = psycopg2.connect(db_uri, connect_timeout=1)
+            cur = conn.cursor()
+            query = """
+                SELECT event_id, event_type, affected_region, severity_score, event_date,
+                       COALESCE(source_text, event_type || ' bulletin') as source_text,
+                       COALESCE(source, 'GDACS / Official Feeds') as source,
+                       COALESCE(parsed_method, 'keyword_rules+gazetteer') as parsed_method
+                FROM external_disruptions
+                ORDER BY event_date DESC, severity_score DESC
+                LIMIT %s;
+            """
+            cur.execute(query, (limit,))
+            rows = cur.fetchall()
+            cur.close()
+            conn.close()
+        except Exception:
+            rows = None
+
+    if rows is None:
+        sqlite_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "supplypulse.db")
+        if os.path.exists(sqlite_path):
+            try:
+                import sqlite3
+                sconn = sqlite3.connect(sqlite_path)
+                scur = sconn.cursor()
+                query = """
+                    SELECT event_id, event_type, affected_region, severity_score, event_date,
+                           COALESCE(source_text, event_type || ' bulletin') as source_text,
+                           COALESCE(source, 'GDACS / Official Feeds') as source,
+                           COALESCE(parsed_method, 'keyword_rules+gazetteer') as parsed_method
+                    FROM external_disruptions
+                    ORDER BY event_date DESC, severity_score DESC
+                    LIMIT ?;
+                """
+                scur.execute(query, (limit,))
+                rows = scur.fetchall()
+                scur.close()
+                sconn.close()
+            except Exception:
+                rows = None
+
+    if not rows:
         return None
-    try:
-        import psycopg2
-        conn = psycopg2.connect(db_uri, connect_timeout=1)
-        cur = conn.cursor()
-        query = """
-            SELECT event_id, event_type, affected_region, severity_score, event_date,
-                   COALESCE(source_text, event_type || ' bulletin') as source_text,
-                   COALESCE(source, 'GDACS / Official Feeds') as source,
-                   COALESCE(parsed_method, 'keyword_rules+gazetteer') as parsed_method
-            FROM external_disruptions
-            ORDER BY event_date DESC, severity_score DESC
-            LIMIT %s;
-        """
-        cur.execute(query, (limit,))
-        rows = cur.fetchall()
-        cur.close()
-        conn.close()
 
-        if not rows:
-            return None
-
-        results = []
-        for row in rows:
-            eid, etype, region, sev, edate, stext, src, method = row
-            results.append(
-                ParsedEventResponse(
-                    event_id=eid,
-                    event_type=etype,
-                    affected_region=region,
-                    severity_score=float(sev),
-                    event_date=str(edate),
-                    source_text=stext,
-                    source=src,
-                    parsed_method=method,
-                    entities=[region.split("/")[0].strip()] if "/" in region else [region],
-                )
+    results = []
+    for row in rows:
+        eid, etype, region, sev, edate, stext, src, method = row
+        results.append(
+            ParsedEventResponse(
+                event_id=eid,
+                event_type=etype,
+                affected_region=region,
+                severity_score=float(sev),
+                event_date=str(edate),
+                source_text=stext,
+                source=src,
+                parsed_method=method,
+                entities=[region.split("/")[0].strip()] if "/" in region else [region],
             )
-        return results
-    except Exception as exc:
-        logger.debug(f"PostgreSQL external_disruptions read skipped: {exc}")
-        return None
+        )
+    return results
 
 
 @router.get(

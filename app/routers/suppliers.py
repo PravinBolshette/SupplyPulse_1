@@ -219,67 +219,80 @@ async def list_suppliers(
 
 
 def _get_suppliers_from_db_if_available() -> Optional[list[SupplierResponse]]:
-    """Attempts to load suppliers from PostgreSQL table 'suppliers'."""
+    """Attempts to load suppliers from PostgreSQL or SQLite table 'suppliers'."""
+    rows = None
     db_uri = os.getenv("DATABASE_URL")
-    if not db_uri or "postgresql" not in db_uri:
+    if db_uri and "postgresql" in db_uri:
+        try:
+            import psycopg2
+            conn = psycopg2.connect(db_uri, connect_timeout=1)
+            cur = conn.cursor()
+            cur.execute("SELECT supplier_id, supplier_name, country, backup_supplier_name FROM suppliers;")
+            rows = cur.fetchall()
+            cur.close()
+            conn.close()
+        except Exception:
+            rows = None
+
+    if rows is None:
+        sqlite_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "supplypulse.db")
+        if os.path.exists(sqlite_path):
+            try:
+                import sqlite3
+                sconn = sqlite3.connect(sqlite_path)
+                scur = sconn.cursor()
+                scur.execute("SELECT supplier_id, supplier_name, country, backup_supplier_name FROM suppliers;")
+                rows = scur.fetchall()
+                scur.close()
+                sconn.close()
+            except Exception:
+                rows = None
+
+    if not rows:
         return None
-    try:
-        import psycopg2
-        conn = psycopg2.connect(db_uri, connect_timeout=1)
-        cur = conn.cursor()
-        cur.execute("SELECT supplier_id, supplier_name, country, backup_supplier_name FROM suppliers;")
-        rows = cur.fetchall()
-        cur.close()
-        conn.close()
 
-        if not rows:
-            return None
+    # Coordinates lookup for known countries
+    geo_map = {
+        "Taiwan": (24.8138, 120.9675, "TW", "Hsinchu", "APAC Freight Corridor"),
+        "Germany": (53.5511, 9.9937, "DE", "Hamburg", "EMEA Depot"),
+        "Netherlands": (51.9244, 4.4777, "NL", "Rotterdam", "EMEA Depot"),
+        "India": (13.0827, 80.2707, "IN", "Chennai", "South Asia Axis"),
+        "China": (31.2304, 121.4737, "CN", "Shanghai", "East Asia Hub"),
+        "Japan": (35.6762, 139.6503, "JP", "Tokyo", "East Asia Hub"),
+        "South Korea": (37.5665, 126.9780, "KR", "Seoul", "East Asia Hub"),
+        "USA": (33.7490, -84.3880, "US", "Atlanta", "Americas Corridor"),
+    }
 
-        # Coordinates lookup for known countries
-        geo_map = {
-            "Taiwan": (24.8138, 120.9675, "TW", "Hsinchu", "APAC Freight Corridor"),
-            "Germany": (53.5511, 9.9937, "DE", "Hamburg", "EMEA Depot"),
-            "Netherlands": (51.9244, 4.4777, "NL", "Rotterdam", "EMEA Depot"),
-            "India": (13.0827, 80.2707, "IN", "Chennai", "South Asia Axis"),
-            "China": (31.2304, 121.4737, "CN", "Shanghai", "East Asia Hub"),
-            "Japan": (35.6762, 139.6503, "JP", "Tokyo", "East Asia Hub"),
-            "South Korea": (37.5665, 126.9780, "KR", "Seoul", "East Asia Hub"),
-            "USA": (33.7490, -84.3880, "US", "Atlanta", "Americas Corridor"),
-        }
-
-        now = datetime.now(timezone.utc)
-        results = []
-        for sid, sname, country, backup in rows:
-            # Deterministic UUID from supplier_id string
-            import hashlib
-            h = hashlib.md5(sid.encode("utf-8")).hexdigest()
-            suuid = UUID(f"{h[:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:32]}")
-            lat, lon, cc, city, reg = geo_map.get(country, (20.0, 77.0, "IN", "Global", "Freight Corridor"))
-            results.append(
-                SupplierResponse(
-                    id=suuid,
-                    name=sname,
-                    contact_email=f"contact@{sid.lower().replace('-', '')}.supplypulse.internal",
-                    lead_time_days=14.0,
-                    reliability_score=0.92,
-                    country_code=cc,
-                    city=city,
-                    lat=lat,
-                    lon=lon,
-                    region=reg,
-                    primary_skus=["SKU-CORE-101"],
-                    sla_adherence=94.0,
-                    variance_avg=1.5,
-                    cost_per_unit=110.0,
-                    status=SupplierStatus.ACTIVE,
-                    created_at=now,
-                    updated_at=now,
-                )
+    now = datetime.now(timezone.utc)
+    results = []
+    for sid, sname, country, backup in rows:
+        # Deterministic UUID from supplier_id string
+        import hashlib
+        h = hashlib.md5(sid.encode("utf-8")).hexdigest()
+        suuid = UUID(f"{h[:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:32]}")
+        lat, lon, cc, city, reg = geo_map.get(country, (20.0, 77.0, "IN", "Global", "Freight Corridor"))
+        results.append(
+            SupplierResponse(
+                id=suuid,
+                name=sname,
+                contact_email=f"contact@{sid.lower().replace('-', '')}.supplypulse.internal",
+                lead_time_days=14.0,
+                reliability_score=0.92,
+                country_code=cc,
+                city=city,
+                lat=lat,
+                lon=lon,
+                region=reg,
+                primary_skus=["SKU-CORE-101"],
+                sla_adherence=94.0,
+                variance_avg=1.5,
+                cost_per_unit=110.0,
+                status=SupplierStatus.ACTIVE,
+                created_at=now,
+                updated_at=now,
             )
-        return results
-    except Exception as exc:
-        logger.debug(f"PostgreSQL suppliers read skipped: {exc}")
-        return None
+        )
+    return results
 
 
 @router.get(

@@ -96,63 +96,84 @@ _seed_initial_alerts()
 
 
 def _get_alerts_from_db_if_available() -> Optional[list[AlertResponse]]:
-    """Attempts to query disruption alerts from PostgreSQL."""
+    """Attempts to query disruption alerts from PostgreSQL or SQLite."""
+    rows = None
     db_uri = os.getenv("DATABASE_URL")
-    if not db_uri or "postgresql" not in db_uri:
-        return None
-    try:
-        import psycopg2
-        import hashlib
-        conn = psycopg2.connect(db_uri, connect_timeout=1)
-        cur = conn.cursor()
-        query = """
-            SELECT da.alert_id, da.supplier_id, s.supplier_name, s.backup_supplier_name,
-                   da.anomaly_score, da.is_flagged, da.predicted_tti_days,
-                   da.recommended_action, da.created_at
-            FROM disruption_alerts da
-            LEFT JOIN suppliers s ON da.supplier_id = s.supplier_id
-            ORDER BY da.predicted_tti_days ASC;
-        """
-        cur.execute(query)
-        rows = cur.fetchall()
-        cur.close()
-        conn.close()
+    if db_uri and "postgresql" in db_uri:
+        try:
+            import psycopg2
+            conn = psycopg2.connect(db_uri, connect_timeout=1)
+            cur = conn.cursor()
+            query = """
+                SELECT da.alert_id, da.supplier_id, s.supplier_name, s.backup_supplier_name,
+                       da.anomaly_score, da.is_flagged, da.predicted_tti_days,
+                       da.recommended_action, da.created_at
+                FROM disruption_alerts da
+                LEFT JOIN suppliers s ON da.supplier_id = s.supplier_id
+                ORDER BY da.predicted_tti_days ASC;
+            """
+            cur.execute(query)
+            rows = cur.fetchall()
+            cur.close()
+            conn.close()
+        except Exception:
+            rows = None
 
-        if not rows:
-            return None
+    if rows is None:
+        sqlite_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "supplypulse.db")
+        if os.path.exists(sqlite_path):
+            try:
+                import sqlite3
+                sconn = sqlite3.connect(sqlite_path)
+                scur = sconn.cursor()
+                query = """
+                    SELECT da.alert_id, da.supplier_id, s.supplier_name, s.backup_supplier_name,
+                           da.anomaly_score, da.is_flagged, da.predicted_tti_days,
+                           da.recommended_action, da.created_at
+                    FROM disruption_alerts da
+                    LEFT JOIN suppliers s ON da.supplier_id = s.supplier_id
+                    ORDER BY da.predicted_tti_days ASC;
+                """
+                scur.execute(query)
+                rows = scur.fetchall()
+                scur.close()
+                sconn.close()
+            except Exception:
+                rows = None
 
-        db_alerts = []
-        for row in rows:
-            aid, sid, sname, bname, score, is_flagged, tti, action, cat = row
-            h = hashlib.md5(f"db-alert-{aid}-{sid}".encode("utf-8")).hexdigest()
-            auuid = UUID(f"{h[:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:32]}")
-            tti_float = float(tti)
-            risk_tier = (
-                RiskLevel.CRITICAL if tti_float <= 5.0
-                else (RiskLevel.HIGH if tti_float <= 14.0 else RiskLevel.MODERATE)
-            )
-            tti_lower = max(0.5, round(tti_float * 0.8, 1))
-            tti_upper = round(tti_float * 1.25, 1)
-            db_alerts.append(
-                AlertResponse(
-                    alert_id=auuid,
-                    sku=f"SKU-{sid}",
-                    predicted_tti_days=tti_float,
-                    risk_level=risk_tier,
-                    triggering_anomaly_id=auuid,
-                    suggested_action=action or f"Activate backup supplier {bname}",
-                    reason=f"Anomaly score {score:.3f} on corridor for {sname}",
-                    tti_range=f"{tti_lower} - {tti_upper} days",
-                    expected_delay_days=round(tti_float * 0.7, 1),
-                    shortfall_days=round(max(0.0, 7.0 - tti_float), 1),
-                    acknowledged=False,
-                    created_at=cat or datetime.now(timezone.utc),
-                )
-            )
-        return db_alerts
-    except Exception as exc:
-        logger.debug(f"PostgreSQL alerts query skipped: {exc}")
+    if not rows:
         return None
+
+    import hashlib
+    db_alerts = []
+    for row in rows:
+        aid, sid, sname, bname, score, is_flagged, tti, action, cat = row
+        h = hashlib.md5(f"db-alert-{aid}-{sid}".encode("utf-8")).hexdigest()
+        auuid = UUID(f"{h[:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:32]}")
+        tti_float = float(tti)
+        risk_tier = (
+            RiskLevel.CRITICAL if tti_float <= 5.0
+            else (RiskLevel.HIGH if tti_float <= 14.0 else RiskLevel.MODERATE)
+        )
+        tti_lower = max(0.5, round(tti_float * 0.8, 1))
+        tti_upper = round(tti_float * 1.25, 1)
+        alert_obj = AlertResponse(
+            alert_id=auuid,
+            sku=f"SKU-{sid}",
+            predicted_tti_days=tti_float,
+            risk_level=risk_tier,
+            triggering_anomaly_id=auuid,
+            suggested_action=action or f"Activate backup supplier {bname}",
+            reason=f"Anomaly score {score:.3f} on corridor for {sname}",
+            tti_range=f"{tti_lower} - {tti_upper} days",
+            expected_delay_days=round(tti_float * 0.7, 1),
+            shortfall_days=round(max(0.0, 7.0 - tti_float), 1),
+            acknowledged=False,
+            created_at=cat or datetime.now(timezone.utc),
+        )
+        db_alerts.append(alert_obj)
+        _ALERTS_DB[auuid] = alert_obj
+    return db_alerts
 
 
 # ---------------------------------------------------------------------------
