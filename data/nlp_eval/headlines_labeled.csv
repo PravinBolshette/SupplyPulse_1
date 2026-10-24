@@ -1,0 +1,107 @@
+headline,expected_event_type,expected_region,expected_severity
+"Category 5 Super Typhoon Chanthu barrel towards Shanghai container terminal",Typhoon,"East China Sea / Yangtze Delta",9.8
+"Severe Tropical Storm hits Ningbo port causing major shipping anchorage gridlock",Typhoon,"East China Sea / Ningbo Hub",7.8
+"Typhoon Gaemi forces closure of maritime terminals across Taiwan Strait",Typhoon,"Taiwan Strait / Hsinchu Corridor",8.5
+"Massive Hurricane winds damage offshore container cranes in Shenzhen",Typhoon,"South China Sea / Pearl River Delta",8.6
+"Tropical Cyclone alert issued for Bay of Bengal approaching Chennai port",Typhoon,"Coromandel Coast / Bay of Bengal",7.2
+"Typhoon Muifa approaches Yangtze Delta triggering red alert evacuation",Typhoon,"East China Sea / Yangtze Delta",9.2
+"Category 3 Hurricane winds suspend berthing operations at Guangzhou port",Typhoon,"South China Sea / Pearl River Delta",7.8
+"Tropical depression generates heavy gale force winds near Tokyo Bay",Typhoon,"Tokyo Bay & Kanto Coastal Plain",6.2
+"Major Typhoon Hagibis batters coastal approaches to Yokohama port",Typhoon,"Tokyo Bay & Kanto Coastal Plain",8.9
+"Dangerous tropical cyclone threatens maritime approaches to Malacca Strait",Typhoon,"Strait of Malacca",7.5
+"Category 4 Typhoon causes emergency suspension of vessel movements in Ningbo",Typhoon,"East China Sea / Ningbo Hub",8.8
+"Severe Typhoon alert prompts vessel anchoring outside Shanghai harbor",Typhoon,"East China Sea / Yangtze Delta",8.2
+"Tropical storm surge floods low-lying berth aprons in Taiwan",Typhoon,"Taiwan Strait / Hsinchu Corridor",7.6
+"Cyclone warning halts cargo loading along Coromandel Coast",Typhoon,"Coromandel Coast / Bay of Bengal",6.9
+"Magnitude 7.6 Earthquake jolts offshore seabed near Hsinchu semiconductor zone",Earthquake,"Taiwan Strait / Hsinchu Corridor",8.6
+"Catastrophic 8.1 magnitude earthquake triggers Pacific tsunami warning near Tokyo",Earthquake,"Tokyo Bay & Kanto Coastal Plain",9.9
+"Major tremor of magnitude 6.8 shakes industrial facilities across Taipei",Earthquake,"Taiwan Strait / Hsinchu Corridor",7.9
+"Seismic shock of magnitude 7.2 halts automated production lines near Yokohama",Earthquake,"Tokyo Bay & Kanto Coastal Plain",8.4
+"Moderate 5.5 magnitude earthquake recorded offshore near Busan port",Earthquake,"Korea Strait / Busan Maritime Hub",6.1
+"Powerful undersea earthquake triggers emergency tsunami alert across Taiwan Strait",Earthquake,"Taiwan Strait / Hsinchu Corridor",8.7
+"Earthquake of magnitude 6.5 disrupts power grids supplying Shanghai ports",Earthquake,"East China Sea / Yangtze Delta",7.5
+"Strong magnitude 7.0 seismic event rocks northern industrial district of Sendai",Earthquake,"Tokyo Bay & Kanto Coastal Plain",8.2
+"Minor magnitude 4.8 tremor felt across Busan industrial logistics hub",Earthquake,"Korea Strait / Busan Maritime Hub",5.1
+"Severe earthquake magnitude 6.9 damages dry dock facilities near Tokyo Bay",Earthquake,"Tokyo Bay & Kanto Coastal Plain",8.1
+"Undersea tremor causes minor ground displacement near Ningbo",Earthquake,"East China Sea / Ningbo Hub",5.8
+"Magnitude 7.3 earthquake strikes southwest coast halting railway logistics",Earthquake,"Taiwan Strait / Hsinchu Corridor",8.5
+"Monsoon flash flooding submerges automotive assembly parks in Chennai",Severe Flooding,"Coromandel Coast / Bay of Bengal",7.2
+"Torrential rain inundates freight rail depots across Yangtze River basin",Severe Flooding,"East China Sea / Yangtze Delta",6.8
+"Severe flooding shuts down warehouse access roads near Rotterdam delta",Severe Flooding,"Rhine-Meuse-Scheldt Delta",6.5
+"Catastrophic flood waters submerge chemical logistics facilities in Antwerp",Severe Flooding,"Scheldt Estuary / Antwerp Hub",7.8
+"Heavy torrential rains inundate semiconductor logistics yards in Hsinchu",Severe Flooding,"Taiwan Strait / Hsinchu Corridor",6.9
+"River Elbe floods overflow dockside rail lines near Hamburg port",Severe Flooding,"Elbe Estuary & Northern Germany",6.7
+"Flash flood inundation paralyzes transport arteries around Bengaluru tech corridor",Severe Flooding,"Southern India Tech Corridor",6.4
+"Massive monsoon flooding breaches containment walls along Chennai coastline",Severe Flooding,"Coromandel Coast / Bay of Bengal",8.0
+"Torrential downpour causes urban flooding and logistics standstill in Guangzhou",Severe Flooding,"South China Sea / Pearl River Delta",6.6
+"Record flooding inundates feeder barge terminals along Rhine River",Severe Flooding,"Rhine-Meuse-Scheldt Delta",7.1
+"Inundation warning issued after extreme rainfall overwhelms Shenzhen drainage",Severe Flooding,"South China Sea / Pearl River Delta",6.2
+"Severe flooding paralyzes container drayage trucking in Antwerp hub",Severe Flooding,"Scheldt Estuary / Antwerp Hub",6.5
+"Dock worker labor union announces 72-hour strike at Port of Hamburg",Port Worker Strike,"Elbe Estuary & Northern Germany",6.2
+"Indefinite port worker strike paralyses container crane offloading in Rotterdam",Port Worker Strike,"Rhine-Meuse-Scheldt Delta",7.4
+"Labor dispute walkout by maritime pilots strands 40 vessels outside Antwerp",Port Worker Strike,"Scheldt Estuary / Antwerp Hub",6.8
+"Stevedores and dock workers stage spontaneous walkout at Chennai harbor",Port Worker Strike,"Coromandel Coast / Bay of Bengal",6.0
+"National port union declares widespread strike across German maritime terminals including Hamburg",Port Worker Strike,"Elbe Estuary & Northern Germany",7.2
+"Crane operators walkout shuts down container handling at Rotterdam port",Port Worker Strike,"Rhine-Meuse-Scheldt Delta",6.7
+"Port worker labor union rejects wage offer, extending strike indefinitely",Port Worker Strike,"Rhine-Meuse-Scheldt Delta",7.6
+"Dock worker walkout brings freight operations to halt along Elbe river",Port Worker Strike,"Elbe Estuary & Northern Germany",6.3
+"Maritime labor dispute delays dry bulk vessel unloading in Antwerp",Port Worker Strike,"Scheldt Estuary / Antwerp Hub",5.9
+"Container handling strike declared by terminal unions in Hamburg",Port Worker Strike,"Elbe Estuary & Northern Germany",6.4
+"Dock labor walkout paralyzes automotive export berths in Chennai",Port Worker Strike,"Coromandel Coast / Bay of Bengal",6.2
+"Feeder vessel grounding causes severe navigation bottleneck in Strait of Malacca",Shipping Bottleneck,"Strait of Malacca",6.4
+"Ultra-large container ship grounded across Suez Canal blocking both directions",Shipping Bottleneck,"Suez Canal Maritime Chokepoint",8.8
+"Extreme drought and low water levels force barge stoppage along Rhine River",Shipping Bottleneck,"Rhine-Meuse-Scheldt Delta",6.6
+"Panama Canal authority slashes daily transit booking slots due to severe drought",Shipping Bottleneck,"Panama Canal Transit Zone",7.5
+"Zero visibility dense fog triggers navigational ban outside Ningbo-Zhoushan port",Shipping Bottleneck,"East China Sea / Ningbo Hub",5.9
+"Vessel collision creates temporary anchorage bottleneck approaching Singapore",Shipping Bottleneck,"Strait of Malacca / Jurong",6.1
+"Severe navigation bottleneck strands 60 container ships outside Suez Canal",Shipping Bottleneck,"Suez Canal Maritime Chokepoint",7.9
+"Dense coastal fog causes emergency movement stoppage at Shanghai port approaches",Shipping Bottleneck,"East China Sea / Yangtze Delta",5.8
+"Low water crisis on Rhine halts chemical raw material barges into Rotterdam",Shipping Bottleneck,"Rhine-Meuse-Scheldt Delta",6.8
+"Panama Canal delays lengthen to 14 days amidst strict freshwater draught restrictions",Shipping Bottleneck,"Panama Canal Transit Zone",7.2
+"Malacca Strait navigation channel narrowed after tanker mechanical breakdown",Shipping Bottleneck,"Strait of Malacca",6.0
+"Canal lock repair creates major logistics chokepoint on Baltic sea shipping route",Shipping Bottleneck,"Baltic Sea Shipping Approaches",5.6
+"Severe winter blizzard freezes commercial shipping lanes in Baltic Sea",Winter Blizzard,"Baltic Sea Shipping Approaches",7.0
+"Subzero Arctic freeze and heavy snowstorm halt rail freight outside Hamburg",Winter Blizzard,"Elbe Estuary & Northern Germany",6.4
+"Extreme winter blizzard triggers icebreaker escort requirement across Baltic approaches",Winter Blizzard,"Baltic Sea Shipping Approaches",7.2
+"Freezing ice storm shuts down regional logistics highways in northern Germany",Winter Blizzard,"Elbe Estuary & Northern Germany",6.1
+"Major blizzard paralyzes container yards across Baltic Sea coastal ports",Winter Blizzard,"Baltic Sea Shipping Approaches",6.8
+"Subzero snowstorm freezes switch tracks at Rotterdam maritime rail terminals",Winter Blizzard,"Rhine-Meuse-Scheldt Delta",6.2
+"Winter storm with subzero temperatures causes frozen crane hydraulics in Baltic hub",Winter Blizzard,"Baltic Sea Shipping Approaches",6.6
+"Dangerous blizzard conditions ground air cargo and freight trains in northern Europe",Winter Blizzard,"Elbe Estuary & Northern Germany",6.3
+"Severe winter blizzard coats ships in heavy ice near Baltic waters",Winter Blizzard,"Baltic Sea Shipping Approaches",6.9
+"Extreme subzero cold wave disrupts cargo handling across Rotterdam berths",Winter Blizzard,"Rhine-Meuse-Scheldt Delta",5.9
+"Massive berth fire and chemical explosion trigger exclusion zone at Jurong Port",Industrial Hazard,"Strait of Malacca / Jurong",8.2
+"Hazardous material explosion rocks chemical storage warehouse near Antwerp",Industrial Hazard,"Scheldt Estuary / Antwerp Hub",7.8
+"Severe petrochemical plant fire shuts down export pipelines in Rotterdam",Industrial Hazard,"Rhine-Meuse-Scheldt Delta",7.4
+"Industrial chemical leak prompts evacuation of logistics zone in Shanghai",Industrial Hazard,"East China Sea / Yangtze Delta",6.5
+"Toxic gas explosion at manufacturing facility halts operations near Chennai",Industrial Hazard,"Coromandel Coast / Bay of Bengal",7.1
+"Major fire engulfs battery raw material warehouse in Shenzhen",Industrial Hazard,"South China Sea / Pearl River Delta",7.0
+"Explosion at semiconductor gas supplier halts deliveries across Hsinchu",Industrial Hazard,"Taiwan Strait / Hsinchu Corridor",8.1
+"Container terminal berth fire forces temporary berth closure in Singapore",Industrial Hazard,"Strait of Malacca / Jurong",6.8
+"Hazardous waste chemical spill blocks access to Port of Hamburg docks",Industrial Hazard,"Elbe Estuary & Northern Germany",6.2
+"Industrial explosion at maritime fuel depot suspends bunkering in Ningbo",Industrial Hazard,"East China Sea / Ningbo Hub",7.3
+"Live-fire naval drills prompt emergency shipping exclusion zone across Taiwan Strait",Geopolitical Disruption,"Taiwan Strait / Hsinchu Corridor",7.6
+"Military missile testing forces maritime detour south of Tokyo Bay",Geopolitical Disruption,"Tokyo Bay & Kanto Coastal Plain",6.8
+"Geopolitical tensions and military blockade drills restrict commercial flights over Taiwan",Geopolitical Disruption,"Taiwan Strait / Hsinchu Corridor",7.4
+"Maritime security alert issued for vessels transiting southern approach to Suez Canal",Geopolitical Disruption,"Suez Canal Maritime Chokepoint",8.2
+"Drone strikes on commercial shipping prompt rerouting away from Suez maritime corridor",Geopolitical Disruption,"Suez Canal Maritime Chokepoint",8.8
+"Geopolitical dispute prompts trade sanctions and heightened customs inspections in Shanghai",Geopolitical Disruption,"East China Sea / Yangtze Delta",6.3
+"Naval exercise warning issued for commercial shipping in South China Sea near Shenzhen",Geopolitical Disruption,"South China Sea / Pearl River Delta",6.5
+"Military exclusion zone announced in international waters off Taiwan Strait",Geopolitical Disruption,"Taiwan Strait / Hsinchu Corridor",7.5
+"Missile attack warnings force global container lines to bypass Suez chokepoint",Geopolitical Disruption,"Suez Canal Maritime Chokepoint",9.0
+"Geopolitical security alert issued following naval incident near Malacca Strait",Geopolitical Disruption,"Strait of Malacca",7.1
+"Volcanic ash cloud grounds cargo aircraft across Pacific approaches to Tokyo",Severe Environmental Alert,"Tokyo Bay & Kanto Coastal Plain",6.5
+"Dangerous sandstorm reduces visibility to zero along approaches to Suez Canal",Severe Environmental Alert,"Suez Canal Maritime Chokepoint",6.1
+"Extreme heatwave buckles railway tracks supplying raw materials to Rotterdam",Severe Environmental Alert,"Rhine-Meuse-Scheldt Delta",5.8
+"Toxic algae bloom forces temporary maritime quarantine near Busan harbor",Severe Environmental Alert,"Korea Strait / Busan Maritime Hub",5.2
+"Severe environmental smog alert restricts heavy commercial vehicles in Shenzhen",Severe Environmental Alert,"South China Sea / Pearl River Delta",4.8
+"Wildfire smoke plumes cause port operational slowdown near Hamburg",Severe Environmental Alert,"Elbe Estuary & Northern Germany",5.0
+"Extreme maritime storm surge damages breakwater along Coromandel Coast",Severe Environmental Alert,"Coromandel Coast / Bay of Bengal",6.2
+"Severe drought depresses river depth and inland waterway freight across Antwerp",Severe Environmental Alert,"Scheldt Estuary / Antwerp Hub",5.7
+"High swell warnings halt offshore pilot boarding at Port of Ningbo",Severe Environmental Alert,"East China Sea / Ningbo Hub",5.4
+"Coastal storm surge prompts flood warnings near Jurong maritime district",Severe Environmental Alert,"Strait of Malacca / Jurong",5.6
+"Severe dust storm reduces navigational visibility across Suez maritime transit",Severe Environmental Alert,"Suez Canal Maritime Chokepoint",5.9
+"Dangerous oceanic turbulence warning halts feeder ferry routes across Taiwan Strait",Severe Environmental Alert,"Taiwan Strait / Hsinchu Corridor",5.5
+"High wind advisory disrupts offshore container transshipment at Busan",Severe Environmental Alert,"Korea Strait / Busan Maritime Hub",5.2
+"Severe coastal storm damages protective maritime barriers near Chennai",Severe Environmental Alert,"Coromandel Coast / Bay of Bengal",6.0
+"Extreme weather alert causes temporary vessel draft restriction outside Shanghai",Severe Environmental Alert,"East China Sea / Yangtze Delta",5.3

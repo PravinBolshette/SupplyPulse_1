@@ -230,11 +230,18 @@ def fetch_raw_disaster_alerts(
 
 
 # ---------------------------------------------------------------------------
-# Module B: NLP Text Extraction Module
+# Module B: NLP Text Extraction Module (Keyword Rules + Gazetteer + spaCy NER)
 # ---------------------------------------------------------------------------
+# HONEST PIPELINE DESCRIPTION:
+# This pipeline utilizes deterministic keyword heuristics combined with a curated
+# maritime and trade hub place-name gazetteer. When the gazetteer misses, spaCy
+# Named Entity Recognition (en_core_web_sm) is invoked as a secondary fallback.
+# THIS IS NOT DEEP LEARNING. It is a deterministic rule-and-gazetteer extraction engine.
+# ---------------------------------------------------------------------------
+
 def classify_event_type(text_content: str) -> str:
     """
-    Classify the disaster/disruption event type using keyword heuristics.
+    Classify the disaster/disruption event type using keyword rules.
     """
     lower = text_content.lower()
 
@@ -260,43 +267,10 @@ def classify_event_type(text_content: str) -> str:
 
 def extract_affected_region(text_content: str) -> str:
     """
-    Extracts affected regions, ports, and manufacturing hubs using spaCy Named Entity
-    Recognition (GPE, LOC, FAC) enhanced with a supply chain gazetteer.
+    Extracts affected region using gazetteer first, then spaCy NER if gazetteer misses.
     """
-    lower = text_content.lower()
-
-    # 1. Direct Gazetteer Check (prioritizes high-precision maritime corridors)
-    for key, region_name in REGION_GAZETTEER.items():
-        if re.search(rf"\b{re.escape(key)}\b", lower):
-            return region_name
-
-    # 2. spaCy Named Entity Recognition (GPE = Country/City, LOC = Location/Sea, FAC = Facility)
-    if SPACY_AVAILABLE and nlp is not None:
-        doc = nlp(text_content)
-        extracted_entities = []
-        for ent in doc.ents:
-            if ent.label_ in ("GPE", "LOC", "FAC"):
-                ent_clean = ent.text.strip()
-                if len(ent_clean) > 2 and ent_clean.lower() not in ["category", "utc", "gdacs"]:
-                    extracted_entities.append(ent_clean)
-
-        if extracted_entities:
-            # Re-check extracted entities against gazetteer
-            for ent in extracted_entities:
-                ent_lower = ent.lower()
-                for key, region_name in REGION_GAZETTEER.items():
-                    if key in ent_lower:
-                        return region_name
-            # Return primary extracted geographical entity
-            return extracted_entities[0]
-
-    # 3. Rule-based Regex fallback for capitalized place candidates
-    match = re.search(r"in\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)|near\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)|at\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)", text_content)
-    if match:
-        candidate = next(g for g in match.groups() if g is not None)
-        return candidate.strip()
-
-    return "Global Maritime Shipping Corridor"
+    result = parse_headline(text_content)
+    return result["region"]
 
 
 def compute_severity_score(text_content: str) -> float:
@@ -308,21 +282,16 @@ def compute_severity_score(text_content: str) -> float:
     score = 5.0  # Base neutral severity
 
     # 1. Quantitative Indicators
-    # Hurricane / Typhoon Category (Saffir-Simpson Scale)
     cat_match = re.search(r"category\s*([1-5])", lower)
     if cat_match:
         cat_num = int(cat_match.group(1))
-        # Category 5 -> 9.6, Category 4 -> 8.6, Category 3 -> 7.8, Category 2 -> 6.8, Category 1 -> 5.8
         score = 4.8 + (cat_num * 1.0)
 
-    # Earthquake Magnitude (Richter Scale)
     mag_match = re.search(r"magnitude\s*([0-9]+(?:\.[0-9]+)?)", lower)
     if mag_match:
         mag = float(mag_match.group(1))
-        # Map magnitude 5.0 -> 6.0, 7.0 -> 8.5, 8.0+ -> 9.8
         score = min(10.0, max(4.0, (mag - 4.0) * 1.4 + 5.0))
 
-    # GDACS Alert Color Levels
     if "red alert" in lower or "red notification" in lower:
         score = max(score, 8.8)
     elif "orange alert" in lower or "orange notification" in lower:
@@ -340,9 +309,96 @@ def compute_severity_score(text_content: str) -> float:
     elif any(k in lower for k in ["minor", "localized", "advisory", "watch", "safe"]):
         score -= 1.5
 
-    # Strictly clamp between 0.0 and 10.0 per PostgreSQL check constraint
-    final_score = float(round(min(10.0, max(0.0, score)), 1))
-    return final_score
+    return float(round(min(10.0, max(0.0, score)), 1))
+
+
+def parse_headline(text_content: str) -> Dict[str, Any]:
+    """
+    Parses an unstructured supply chain disruption headline or text bulletin.
+
+    Architecture:
+    Combines keyword matching rules for event types with a place-name gazetteer
+    for maritime and manufacturing hub identification. spaCy Named Entity Recognition
+    (en_core_web_sm) is used as a fallback when the gazetteer misses.
+    (Advisory heuristic NLP; NOT deep learning).
+
+    Returns:
+        dict with keys:
+          - event_type: str
+          - region: str
+          - severity: float
+          - entities: list[str]
+          - method: str ('keyword_rules+gazetteer', 'keyword_rules+spacy_ner', or 'keyword_rules+heuristic_fallback')
+    """
+    clean_text = text_content.strip()
+    lower = clean_text.lower()
+
+    # 1. Event Type Classification
+    event_type = classify_event_type(clean_text)
+
+    # 2. Region & Entity Extraction
+    entities: List[str] = []
+    region: Optional[str] = None
+    method = "keyword_rules+heuristic_fallback"
+
+    # Step 2a: Direct Gazetteer Lookup
+    for key, region_name in REGION_GAZETTEER.items():
+        if re.search(rf"\b{re.escape(key)}\b", lower):
+            region = region_name
+            entities.append(key.capitalize())
+            method = "keyword_rules+gazetteer"
+            break
+
+    # Step 2b: spaCy NER Fallback if gazetteer misses
+    if region is None:
+        if SPACY_AVAILABLE and nlp is not None:
+            doc = nlp(clean_text)
+            ner_ents = [
+                e.text.strip()
+                for e in doc.ents
+                if e.label_ in ("GPE", "LOC", "FAC") and len(e.text.strip()) > 2
+            ]
+            entities.extend(ner_ents)
+            if ner_ents:
+                for ent in ner_ents:
+                    ent_low = ent.lower()
+                    for key, region_name in REGION_GAZETTEER.items():
+                        if key in ent_low:
+                            region = region_name
+                            method = "keyword_rules+spacy_ner"
+                            break
+                    if region:
+                        break
+
+                if not region:
+                    region = ner_ents[0]
+                    method = "keyword_rules+spacy_ner"
+
+    # Step 2c: Rule-based regex fallback
+    if region is None:
+        match = re.search(r"\b(?:in|near|at|off|outside|approaching)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)", clean_text)
+        if match:
+            cand = match.group(1).strip()
+            region = cand
+            entities.append(cand)
+            method = "keyword_rules+heuristic_fallback"
+        else:
+            region = "Global Maritime Shipping Corridor"
+            method = "keyword_rules+default_corridor"
+
+    # 3. Severity Score
+    severity = compute_severity_score(clean_text)
+
+    # Deduplicate entities preserving order
+    dedup_entities = list(dict.fromkeys(entities))
+
+    return {
+        "event_type": event_type,
+        "region": region,
+        "severity": severity,
+        "entities": dedup_entities,
+        "method": method,
+    }
 
 
 def parse_disruption_text(
@@ -350,24 +406,19 @@ def parse_disruption_text(
     index: int = 1,
 ) -> Dict[str, Any]:
     """
-    Core NLP Parsing Engine: transforms raw unstructured alert dictionaries
-    into structured database records ready for ingestion.
+    Transforms raw unstructured alert dictionaries into structured records.
     """
     title = alert_raw.get("title", "")
     description = alert_raw.get("description", "")
     full_text = f"{title}. {description}".strip()
 
-    # 1. NLP Classification & Entity Extraction
-    event_type = classify_event_type(full_text)
-    affected_region = extract_affected_region(full_text)
-    severity_score = compute_severity_score(full_text)
+    parsed = parse_headline(full_text)
 
-    # 2. Parse Event Date
+    # Parse Event Date
     raw_date = alert_raw.get("pub_date")
     parsed_date = date.today()
     if raw_date:
         try:
-            # Handle common ISO or standard date formats
             if len(raw_date) >= 10 and raw_date[:10].count("-") == 2:
                 parsed_date = datetime.strptime(raw_date[:10], "%Y-%m-%d").date()
             else:
@@ -377,17 +428,20 @@ def parse_disruption_text(
         except Exception:
             parsed_date = date.today()
 
-    # 3. Deterministic Event ID (Ensures Idempotent Ingestion)
-    unique_string = alert_raw.get("guid") or f"{event_type}_{affected_region}_{parsed_date}_{title[:30]}"
+    # Deterministic Event ID
+    unique_string = alert_raw.get("guid") or f"{parsed['event_type']}_{parsed['region']}_{parsed_date}_{title[:30]}"
     hash_digest = hashlib.sha256(unique_string.encode("utf-8")).hexdigest()[:8].upper()
     event_id = f"EVT-NLP-{hash_digest}"
 
     return {
         "event_id": event_id,
-        "event_type": event_type,
-        "affected_region": affected_region,
-        "severity_score": severity_score,
+        "event_type": parsed["event_type"],
+        "affected_region": parsed["region"],
+        "severity_score": parsed["severity"],
         "event_date": parsed_date,
+        "source_text": full_text[:600],
+        "source": alert_raw.get("source", "GDACS / Reuters / Maritime Feed"),
+        "parsed_method": parsed["method"],
         "raw_snippet": title[:90],
     }
 
@@ -397,7 +451,7 @@ def parse_disruption_text(
 # ---------------------------------------------------------------------------
 def ensure_external_disruptions_table(engine, is_sqlite: bool = False):
     """
-    Ensures the `external_disruptions` table exists and includes the `event_date` column.
+    Ensures external_disruptions table exists with source_text, source, and parsed_method.
     """
     with engine.begin() as conn:
         if is_sqlite:
@@ -407,7 +461,10 @@ def ensure_external_disruptions_table(engine, is_sqlite: bool = False):
                     event_type TEXT NOT NULL,
                     affected_region TEXT NOT NULL,
                     severity_score REAL CHECK (severity_score >= 0.0 AND severity_score <= 10.0),
-                    event_date TEXT DEFAULT CURRENT_DATE
+                    event_date TEXT DEFAULT CURRENT_DATE,
+                    source_text TEXT,
+                    source TEXT,
+                    parsed_method TEXT
                 );
             """))
         else:
@@ -417,14 +474,17 @@ def ensure_external_disruptions_table(engine, is_sqlite: bool = False):
                     event_type TEXT NOT NULL,
                     affected_region TEXT NOT NULL,
                     severity_score FLOAT CHECK (severity_score >= 0.0 AND severity_score <= 10.0),
-                    event_date DATE DEFAULT CURRENT_DATE
+                    event_date DATE DEFAULT CURRENT_DATE,
+                    source_text TEXT,
+                    source TEXT,
+                    parsed_method TEXT
                 );
             """))
-            # Ensure event_date column exists if table was provisioned earlier without it
-            try:
-                conn.execute(text("ALTER TABLE external_disruptions ADD COLUMN IF NOT EXISTS event_date DATE DEFAULT CURRENT_DATE;"))
-            except Exception:
-                pass
+            for col in ["source_text TEXT", "source TEXT", "parsed_method TEXT"]:
+                try:
+                    conn.execute(text(f"ALTER TABLE external_disruptions ADD COLUMN IF NOT EXISTS {col};"))
+                except Exception:
+                    pass
 
 
 def ingest_disruptions_to_db(
@@ -433,9 +493,7 @@ def ingest_disruptions_to_db(
     is_sqlite: bool = False,
 ) -> Tuple[int, int]:
     """
-    Inserts structured NLP disruption records into `external_disruptions` using
-    ON CONFLICT (event_id) DO NOTHING to prevent duplicate insertion on repeated polling.
-    Returns (inserted_count, skipped_count).
+    Inserts structured NLP disruption records into external_disruptions.
     """
     if not records:
         logger.warning("No records provided for ingestion.")
@@ -445,14 +503,23 @@ def ingest_disruptions_to_db(
 
     if is_sqlite:
         insert_sql = """
-            INSERT OR IGNORE INTO external_disruptions (event_id, event_type, affected_region, severity_score, event_date)
-            VALUES (:event_id, :event_type, :affected_region, :severity_score, :event_date);
+            INSERT OR IGNORE INTO external_disruptions (
+                event_id, event_type, affected_region, severity_score, event_date,
+                source_text, source, parsed_method
+            ) VALUES (
+                :event_id, :event_type, :affected_region, :severity_score, :event_date,
+                :source_text, :source, :parsed_method
+            );
         """
     else:
         insert_sql = """
-            INSERT INTO external_disruptions (event_id, event_type, affected_region, severity_score, event_date)
-            VALUES (:event_id, :event_type, :affected_region, :severity_score, :event_date)
-            ON CONFLICT (event_id) DO NOTHING;
+            INSERT INTO external_disruptions (
+                event_id, event_type, affected_region, severity_score, event_date,
+                source_text, source, parsed_method
+            ) VALUES (
+                :event_id, :event_type, :affected_region, :severity_score, :event_date,
+                :source_text, :source, :parsed_method
+            ) ON CONFLICT (event_id) DO NOTHING;
         """
 
     inserted_count = 0
@@ -460,13 +527,15 @@ def ingest_disruptions_to_db(
 
     with engine.begin() as conn:
         for rec in records:
-            # Bind parameters cleanly
             params = {
                 "event_id": rec["event_id"],
                 "event_type": rec["event_type"],
                 "affected_region": rec["affected_region"],
                 "severity_score": rec["severity_score"],
                 "event_date": str(rec["event_date"]),
+                "source_text": rec.get("source_text", rec.get("raw_snippet", "")),
+                "source": rec.get("source", "GDACS / Reuters / Maritime Feed"),
+                "parsed_method": rec.get("parsed_method", "keyword_rules+gazetteer"),
             }
             res = conn.execute(text(insert_sql), params)
             if res.rowcount and res.rowcount > 0:
@@ -475,6 +544,7 @@ def ingest_disruptions_to_db(
                 skipped_count += 1
 
     return inserted_count, skipped_count
+
 
 
 # ---------------------------------------------------------------------------
