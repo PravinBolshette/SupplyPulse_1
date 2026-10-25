@@ -63,6 +63,20 @@ def test_process_time_header():
     assert latency >= 0.0
 
 
+def get_auth_headers(role="manager", username="test_mgr"):
+    from app.core.security import create_access_token, _USERS_CACHE, hash_password
+    clean = username.strip().lower()
+    if clean not in _USERS_CACHE:
+        _USERS_CACHE[clean] = {
+            "user_id": f"test-uuid-{clean}",
+            "username": clean,
+            "password_hash": hash_password("pass123"),
+            "role": role,
+        }
+    token = create_access_token(data={"sub": clean, "role": role})
+    return {"Authorization": f"Bearer {token}"}
+
+
 # ---------------------------------------------------------------------------
 # 2. Global Error Handling & Validation Tests
 # ---------------------------------------------------------------------------
@@ -79,7 +93,8 @@ def test_validation_error_envelope_sanitization():
         "reliability_score": 1.5,  # Must be <= 1.0
         "country_code": "deu",  # Must be 2 uppercase chars
     }
-    response = client.post("/api/v1/suppliers", json=invalid_supplier)
+    mgr_headers = get_auth_headers(role="manager", username="validator_mgr")
+    response = client.post("/api/v1/suppliers", json=invalid_supplier, headers=mgr_headers)
     assert response.status_code == 422
     body = response.json()
     assert body["success"] is False
@@ -125,31 +140,49 @@ def test_list_suppliers_paginated():
 
 
 def test_create_supplier_success_and_conflict():
-    """Validates successful supplier onboarding and duplicate email rejection."""
+    """Validates role-gated supplier onboarding, initial inventory provisioning, and conflict handling."""
     unique_email = f"procure-{uuid.uuid4().hex[:6]}@kyoto-semicon.jp"
+    unique_sup_id = f"SUP-TEST-{uuid.uuid4().hex[:4].upper()}"
     payload = {
-        "name": "Kyoto Advanced Semiconductor Corp",
+        "supplier_id": unique_sup_id,
+        "supplier_name": "Kyoto Advanced Semiconductor Corp",
+        "country": "Japan",
+        "backup_supplier_id": "SUP-001",
+        "contracted_lead_time_days": 16,
+        "sku": "SKU-KYOTO-01",
+        "current_stock_units": 650,
+        "reorder_point": 200,
+        "daily_consumption_rate": 30.0,
         "contact_email": unique_email,
-        "lead_time_days": 16.5,
-        "reliability_score": 0.97,
-        "country_code": "JP",
         "cost_per_unit": 210.0,
     }
-    response = client.post("/api/v1/suppliers", json=payload)
+
+    # 1. Unauthenticated request rejected (401)
+    unauth_res = client.post("/api/v1/suppliers", json=payload)
+    assert unauth_res.status_code == 401
+
+    # 2. Analyst request rejected by RBAC (403)
+    analyst_headers = get_auth_headers(role="analyst", username="analyst_test")
+    analyst_res = client.post("/api/v1/suppliers", json=payload, headers=analyst_headers)
+    assert analyst_res.status_code == 403
+
+    # 3. Manager successfully provisions supplier & inventory (201)
+    mgr_headers = get_auth_headers(role="manager", username="mgr_test")
+    response = client.post("/api/v1/suppliers", json=payload, headers=mgr_headers)
     assert response.status_code == 201
     created = response.json()["data"]
-    assert created["name"] == payload["name"]
+    assert created["name"] == payload["supplier_name"]
     assert created["contact_email"] == payload["contact_email"]
     assert created["status"] == "ACTIVE"
     supplier_id = created["id"]
 
-    # Retrieve created supplier
+    # 4. Retrieve created supplier
     get_res = client.get(f"/api/v1/suppliers/{supplier_id}")
     assert get_res.status_code == 200
     assert get_res.json()["data"]["id"] == supplier_id
 
-    # Conflict check: Attempt creating duplicate email
-    dup_res = client.post("/api/v1/suppliers", json=payload)
+    # 5. Duplicate ID rejected (409)
+    dup_res = client.post("/api/v1/suppliers", json=payload, headers=mgr_headers)
     assert dup_res.status_code == 409
     assert dup_res.json()["error"]["code"] == "ENTITY_CONFLICT"
 

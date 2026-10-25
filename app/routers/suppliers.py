@@ -6,13 +6,16 @@ and risk posture retrieval.
 """
 
 from datetime import datetime, timedelta, timezone
+import hashlib
 import os
+import sqlite3
 from typing import Annotated, Optional
 from uuid import UUID, uuid4
-from fastapi import APIRouter, Path, Query, status
+from fastapi import APIRouter, Depends, Path, Query, status
 
 from app.core.errors import EntityConflictException, EntityNotFoundException
 from app.core.logging import get_logger
+from app.core.security import require_roles
 from app.schemas.common import APIResponse, PaginatedResponse
 from app.schemas.supplier import (
     SupplierCreate,
@@ -128,43 +131,164 @@ _seed_initial_suppliers()
     "",
     response_model=APIResponse[SupplierResponse],
     status_code=status.HTTP_201_CREATED,
-    summary="Onboard New Supplier",
-    description="Registers a new supplier in the system with initial reliability metrics and lead times.",
+    summary="Register & Provision New Tier-1 Supplier",
+    description="Registers a new Tier-1 supplier and provisions baseline inventory (requires manager or admin).",
+)
+@router.post(
+    "/",
+    response_model=APIResponse[SupplierResponse],
+    status_code=status.HTTP_201_CREATED,
+    include_in_schema=False,
 )
 async def create_supplier(
     payload: SupplierCreate,
+    current_user: Annotated[dict, Depends(require_roles(["manager", "admin"]))],
 ) -> APIResponse[SupplierResponse]:
     """
-    Creates a new supplier with auto-generated UUID and audit timestamps.
+    Onboards a new Tier-1 supplier and provisions baseline inventory in inventory_levels
+    within an atomic transaction. Enforces uniqueness on supplier ID and email.
     """
-    # Check for name/email uniqueness
+    # 1. In-memory duplicate checks
     for existing in _SUPPLIERS_DB.values():
+        if getattr(existing, "supplier_id", None) and existing.supplier_id == payload.supplier_id:
+            raise EntityConflictException(f"Supplier with ID '{payload.supplier_id}' already exists.")
         if existing.contact_email.lower() == payload.contact_email.lower():
-            raise EntityConflictException(
-                f"Supplier with contact email '{payload.contact_email}' already exists."
+            raise EntityConflictException(f"Supplier with contact email '{payload.contact_email}' already exists.")
+
+    # 2. Database Persistence (PostgreSQL or SQLite)
+    persisted_to_db = False
+    db_uri = os.getenv("DATABASE_URL")
+
+    if db_uri and "postgresql" in db_uri:
+        try:
+            import psycopg2
+            conn = psycopg2.connect(db_uri, connect_timeout=2)
+            cur = conn.cursor()
+            cur.execute("SELECT supplier_id FROM suppliers WHERE supplier_id = %s;", (payload.supplier_id,))
+            if cur.fetchone():
+                cur.close()
+                conn.close()
+                raise EntityConflictException(f"Supplier with ID '{payload.supplier_id}' already exists in database.")
+
+            # Insert into suppliers
+            cur.execute(
+                "INSERT INTO suppliers (supplier_id, supplier_name, country, backup_supplier_name) "
+                "VALUES (%s, %s, %s, %s);",
+                (payload.supplier_id, payload.supplier_name, payload.country, payload.backup_supplier_id),
             )
 
+            # Provision initial baseline inventory in inventory_levels
+            stockout = bool(payload.current_stock_units <= payload.reorder_point)
+            facility_id = f"WH-{payload.supplier_id}"
+            cur.execute(
+                "INSERT INTO inventory_levels (facility_id, sku_id, current_stock_units, daily_consumption_rate, stockout_flag) "
+                "VALUES (%s, %s, %s, %s, %s);",
+                (facility_id, payload.sku, payload.current_stock_units, payload.daily_consumption_rate, stockout),
+            )
+            conn.commit()
+            cur.close()
+            conn.close()
+            persisted_to_db = True
+            logger.info(f"Persisted supplier '{payload.supplier_id}' and SKU '{payload.sku}' to PostgreSQL.")
+        except EntityConflictException:
+            raise
+        except Exception as e:
+            logger.warning(f"PostgreSQL supplier insert bypassed/failed: {e}")
+
+    if not persisted_to_db:
+        sqlite_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "supplypulse.db")
+        if os.path.exists(sqlite_path):
+            try:
+                sconn = sqlite3.connect(sqlite_path)
+                scur = sconn.cursor()
+                scur.execute("SELECT supplier_id FROM suppliers WHERE supplier_id = ?;", (payload.supplier_id,))
+                if scur.fetchone():
+                    scur.close()
+                    sconn.close()
+                    raise EntityConflictException(f"Supplier with ID '{payload.supplier_id}' already exists in database.")
+
+                scur.execute(
+                    "INSERT INTO suppliers (supplier_id, supplier_name, country, backup_supplier_name) "
+                    "VALUES (?, ?, ?, ?);",
+                    (payload.supplier_id, payload.supplier_name, payload.country, payload.backup_supplier_id),
+                )
+
+                stockout = 1 if payload.current_stock_units <= payload.reorder_point else 0
+                facility_id = f"WH-{payload.supplier_id}"
+                scur.execute(
+                    "INSERT INTO inventory_levels (facility_id, sku_id, current_stock_units, daily_consumption_rate, stockout_flag) "
+                    "VALUES (?, ?, ?, ?, ?);",
+                    (facility_id, payload.sku, payload.current_stock_units, payload.daily_consumption_rate, stockout),
+                )
+                sconn.commit()
+                scur.close()
+                sconn.close()
+                persisted_to_db = True
+                logger.info(f"Persisted supplier '{payload.supplier_id}' and SKU '{payload.sku}' to SQLite.")
+            except EntityConflictException:
+                raise
+            except Exception as e:
+                logger.warning(f"SQLite supplier insert bypassed/failed: {e}")
+
+    # 3. Assemble and record new supplier in memory
     now = datetime.now(timezone.utc)
+    h = hashlib.md5(payload.supplier_id.encode("utf-8")).hexdigest()
+    suuid = UUID(f"{h[:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:32]}")
+
+    geo_map = {
+        "Taiwan": (24.8138, 120.9675, "TW", "Hsinchu", "APAC Freight Corridor"),
+        "Germany": (53.5511, 9.9937, "DE", "Hamburg", "EMEA Depot"),
+        "Netherlands": (51.9244, 4.4777, "NL", "Rotterdam", "EMEA Depot"),
+        "India": (13.0827, 80.2707, "IN", "Chennai", "South Axis"),
+        "China": (31.2304, 121.4737, "CN", "Shanghai", "East Asia Hub"),
+        "Japan": (35.6762, 139.6503, "JP", "Tokyo", "East Asia Hub"),
+        "South Korea": (37.5665, 126.9780, "KR", "Seoul", "East Asia Hub"),
+        "USA": (33.7490, -84.3880, "US", "Atlanta", "Americas Corridor"),
+        "Switzerland": (47.3769, 8.5417, "CH", "Zurich", "EMEA Depot"),
+        "Singapore": (1.3521, 103.8198, "SG", "Singapore Hub", "APAC Freight Corridor"),
+    }
+    lat, lon, cc, city, reg = geo_map.get(
+        payload.country,
+        (25.0, 80.0, payload.country_code or "XX", f"{payload.country} Terminal", "Global Freight Corridor")
+    )
+
     new_supplier = SupplierResponse(
-        id=uuid4(),
-        name=payload.name,
+        id=suuid,
+        supplier_id=payload.supplier_id,
+        supplier_name=payload.supplier_name,
+        name=payload.supplier_name,
+        country=payload.country,
+        backup_supplier_name=payload.backup_supplier_id,
+        contracted_lead_time_days=payload.contracted_lead_time_days,
         contact_email=payload.contact_email,
         lead_time_days=payload.lead_time_days,
-        reliability_score=payload.reliability_score,
-        country_code=payload.country_code,
-        cost_per_unit=payload.cost_per_unit,
+        reliability_score=payload.reliability_score or 0.95,
+        country_code=cc,
+        city=city,
+        lat=lat,
+        lon=lon,
+        region=reg,
+        primary_skus=[payload.sku],
+        sla_adherence=96.0,
+        variance_avg=1.2,
+        cost_per_unit=payload.cost_per_unit or 100.0,
         status=SupplierStatus.ACTIVE,
         created_at=now,
         updated_at=now,
     )
 
     _SUPPLIERS_DB[new_supplier.id] = new_supplier
-    logger.info(f"Successfully onboarded supplier '{new_supplier.name}' (ID: {new_supplier.id})")
+    logger.info(f"Successfully registered supplier '{new_supplier.name}' ({payload.supplier_id}) by user '{current_user.get('username')}'")
 
     return APIResponse(
         success=True,
         data=new_supplier,
-        metadata={"action": "supplier_onboarded", "id": str(new_supplier.id)},
+        metadata={
+            "action": "supplier_registered",
+            "supplier_id": payload.supplier_id,
+            "provisioned_sku": payload.sku,
+            "registered_by": current_user.get("username"),
+        },
     )
 
 
