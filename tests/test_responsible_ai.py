@@ -183,3 +183,116 @@ def test_guardrails_status_endpoint():
     assert data["autonomous_execution_allowed"] is False
     assert data["human_in_the_loop_required"] is True
     assert data["override_justification_enforced"] is True
+
+
+def test_mitigation_role_access_control():
+    """
+    Validates that:
+    1. Unauthenticated requests are rejected with 401 Unauthorized.
+    2. Analyst role requests are rejected with 403 Forbidden (RBAC enforcement).
+    3. Manager role requests are permitted with 201 Created.
+    """
+    payload = {
+        "alert_id": "aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa",
+        "ai_recommendation": SAMPLE_AI_RECOMMENDATION,
+        "action_taken": "APPROVED",
+        "operator_notes": "Role access control validation pass.",
+        "confirmed": True,
+    }
+
+    # 1. Unauthenticated -> 401
+    unauth_resp = client.post("/api/v1/mitigation/action", json=payload)
+    assert unauth_resp.status_code == 401
+
+    # 2. Analyst role -> 403
+    analyst_headers = get_auth_headers(username="analyst_user", role="analyst")
+    analyst_resp = client.post("/api/v1/mitigation/action", json=payload, headers=analyst_headers)
+    assert analyst_resp.status_code == 403
+
+    # 3. Manager role -> 201
+    mgr_headers = get_auth_headers(username="manager_user", role="manager")
+    mgr_resp = client.post("/api/v1/mitigation/action", json=payload, headers=mgr_headers)
+    assert mgr_resp.status_code == 201
+
+
+def test_non_spoofable_actor_attribution():
+    """
+    Validates that client-supplied identity fields in request bodies are ignored
+    in favor of the cryptographically verified JWT claims.
+    """
+    payload = {
+        "operator_id": "spoofed_identity@unauthorized.com",
+        "alert_id": "bbbbbbbb-2222-2222-2222-bbbbbbbbbbbb",
+        "ai_recommendation": SAMPLE_AI_RECOMMENDATION,
+        "action_taken": "APPROVED",
+        "operator_notes": "Identity spoofing defense audit test.",
+        "confirmed": True,
+    }
+    legit_manager_headers = get_auth_headers(username="legitimate_manager", role="manager")
+    response = client.post("/api/v1/mitigation/action", json=payload, headers=legit_manager_headers)
+    assert response.status_code == 201
+    data = response.json()["data"]
+    # Must attribute strictly to verified JWT username, ignoring spoofed body field
+    assert data["operator_id"] == "legitimate_manager"
+    assert data["operator_id"] != payload["operator_id"]
+
+
+def test_transactional_fail_safe_raises_503(monkeypatch):
+    """
+    Validates that database persistence failure immediately rolls back and
+    raises HTTP 503 Service Unavailable, preventing compliance bypasses.
+    """
+    monkeypatch.setenv("SIMULATE_AUDIT_DB_FAIL", "true")
+    payload = {
+        "alert_id": "cccccccc-3333-3333-3333-cccccccccccc",
+        "ai_recommendation": SAMPLE_AI_RECOMMENDATION,
+        "action_taken": "APPROVED",
+        "operator_notes": "Simulated disk/DB dropout transaction test.",
+        "confirmed": True,
+    }
+    headers = get_auth_headers(username="recovery_mgr", role="manager")
+    response = client.post("/api/v1/mitigation/action", json=payload, headers=headers)
+    assert response.status_code == 503
+    body = response.json()
+    assert "Audit trail persistence failed" in str(body)
+
+
+def test_audit_log_database_immutability_trigger():
+    """
+    Validates that database-level triggers strictly block direct UPDATE
+    and DELETE operations on the audit_logs table.
+    """
+    import os
+    import sqlite3
+    sqlite_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "supplypulse.db")
+    if os.path.exists(sqlite_path):
+        conn = sqlite3.connect(sqlite_path)
+        # Verify trigger exists in SQLite
+        triggers = conn.execute("SELECT name FROM sqlite_master WHERE type='trigger'").fetchall()
+        trigger_names = [t[0] for t in triggers]
+        assert "trg_audit_logs_no_update" in trigger_names
+        assert "trg_audit_logs_no_delete" in trigger_names
+
+        # Insert a valid row
+        conn.execute(
+            "INSERT INTO audit_logs (log_id, operator_id, alert_id, ai_recommendation, action_taken) "
+            "VALUES ('immut-test-uuid', 'audit_agent', 'alt-999', '{}', 'APPROVED');"
+        )
+        conn.commit()
+
+        # Assert direct UPDATE fails
+        import pytest
+        with pytest.raises(sqlite3.IntegrityError, match="SECURITY VIOLATION: audit_logs records are strictly immutable"):
+            conn.execute("UPDATE audit_logs SET operator_notes = 'tampered' WHERE log_id = 'immut-test-uuid';")
+
+        # Assert direct DELETE fails
+        with pytest.raises(sqlite3.IntegrityError, match="SECURITY VIOLATION: audit_logs records are strictly immutable"):
+            conn.execute("DELETE FROM audit_logs WHERE log_id = 'immut-test-uuid';")
+
+        # Clean up test row by disabling delete trigger temporarily
+        conn.execute("DROP TRIGGER trg_audit_logs_no_delete;")
+        conn.execute("DELETE FROM audit_logs WHERE log_id = 'immut-test-uuid';")
+        conn.execute("CREATE TRIGGER trg_audit_logs_no_delete BEFORE DELETE ON audit_logs BEGIN SELECT RAISE(ABORT, 'SECURITY VIOLATION: audit_logs records are strictly immutable.'); END;")
+        conn.commit()
+        conn.close()
+

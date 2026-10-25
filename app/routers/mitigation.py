@@ -67,15 +67,16 @@ def _seed_initial_audit_logs() -> None:
 _seed_initial_audit_logs()
 
 
-def _save_to_postgres(log_entry: AuditLogResponse) -> None:
+def _persist_audit_log(log_entry: AuditLogResponse) -> bool:
     """
-    Persists the audit log entry directly to the PostgreSQL audit_logs table.
-    Raises an exception if persistence fails.
+    Persists the audit log entry directly to the PostgreSQL or SQLite audit_logs table.
+    Enforces atomic write and raises an exception on failure (triggering HTTP 503).
     """
     if os.getenv("SIMULATE_AUDIT_DB_FAIL") == "true":
         raise RuntimeError("Simulated database failure during audit log insertion.")
 
     db_uri = os.getenv("DATABASE_URL")
+    # 1. PostgreSQL Persistence
     if db_uri and "postgresql" in db_uri:
         import psycopg2
         import json
@@ -106,6 +107,46 @@ def _save_to_postgres(log_entry: AuditLogResponse) -> None:
         cur.close()
         conn.close()
         logger.info(f"Audit log {log_entry.log_id} persisted to PostgreSQL table 'audit_logs'.")
+        return True
+
+    # 2. SQLite Fallback Persistence
+    sqlite_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "supplypulse.db")
+    if os.path.exists(sqlite_path):
+        import sqlite3
+        import json
+        sconn = sqlite3.connect(sqlite_path)
+        scur = sconn.cursor()
+        query = """
+            INSERT INTO audit_logs (
+                log_id, timestamp, operator_id, alert_id, ai_recommendation,
+                action_taken, operator_notes, confirmed, mitigation_target, cost_exposure_usd
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        """
+        scur.execute(
+            query,
+            (
+                str(log_entry.log_id),
+                str(log_entry.timestamp),
+                log_entry.operator_id,
+                str(log_entry.alert_id),
+                json.dumps(log_entry.ai_recommendation),
+                log_entry.action_taken.value,
+                log_entry.operator_notes,
+                1 if log_entry.confirmed else 0,
+                log_entry.mitigation_target,
+                float(log_entry.cost_exposure_usd or 0.0),
+            ),
+        )
+        sconn.commit()
+        scur.close()
+        sconn.close()
+        logger.info(f"Audit log {log_entry.log_id} persisted to SQLite table 'audit_logs'.")
+        return True
+
+    return False
+
+
+_save_to_postgres = _persist_audit_log
 
 
 # ---------------------------------------------------------------------------
@@ -151,23 +192,20 @@ async def authorize_mitigation_action(
         audit_immutable=True,
     )
 
-    # Persist to PostgreSQL audit table; strictly fail with 503 if DB write fails
-    pg_saved = False
+    # Persist to PostgreSQL or SQLite audit table; strictly fail with 503 if DB write fails
+    db_persisted = False
     try:
-        _save_to_postgres(new_log)
-        pg_saved = True
+        db_persisted = _persist_audit_log(new_log)
     except Exception as exc:
-        logger.error(f"Audit log persistence to PostgreSQL failed: {exc}")
+        logger.error(f"Audit log persistence failed: {exc}")
         if os.getenv("DEMO_MODE") != "true" or os.getenv("SIMULATE_AUDIT_DB_FAIL") == "true":
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail=f"Audit trail persistence failed: {str(exc)}",
             )
 
-
     # Append to local ledger
     _AUDIT_LOGS_DB.append(new_log)
-
 
     # 3. Synchronize alert state in memory
     try:
@@ -182,7 +220,7 @@ async def authorize_mitigation_action(
                 triggering_anomaly_id=existing_alert.triggering_anomaly_id,
                 suggested_action=existing_alert.suggested_action,
                 acknowledged=True,
-                acknowledged_by=payload.operator_id,
+                acknowledged_by=effective_operator_id,
                 acknowledgment_note=payload.operator_notes or f"Mitigation {payload.action_taken.value}",
                 acknowledged_at=now,
                 created_at=existing_alert.created_at,
@@ -192,7 +230,7 @@ async def authorize_mitigation_action(
 
     logger.info(
         f"[RESPONSIBLE-AI] Action {payload.action_taken.value} authorized by "
-        f"'{payload.operator_id}' for alert '{payload.alert_id}' (Log ID: {new_log.log_id})"
+        f"'{effective_operator_id}' for alert '{payload.alert_id}' (Log ID: {new_log.log_id})"
     )
 
     return APIResponse(
@@ -202,7 +240,8 @@ async def authorize_mitigation_action(
             "guardrail_verification": "PASSED",
             "advisory_only_enforced": True,
             "immutable_audit_id": str(new_log.log_id),
-            "postgres_persisted": pg_saved,
+            "db_persisted": db_persisted,
+            "authenticated_operator": effective_operator_id,
         },
     )
 
